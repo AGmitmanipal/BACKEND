@@ -29,8 +29,8 @@ const requireAuth = async (req, res, next) => {
             user = await User.create({
                 uid,
                 email,
-                role: 'pending',
-                approved: false
+                role: 'user', // Changed from 'pending'
+                approved: true // Changed from false
             });
             console.log(`✨ New user created: ${email} (${uid})`);
         }
@@ -48,31 +48,14 @@ const requireAuth = async (req, res, next) => {
 };
 
 const requireApprovedUser = (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
-
-    // Admins always bypass approval check, or should we separate?
-    // Use case said: "Allow only role === 'admin'" for admin routes.
-    // For user routes, if logic is shared, admins should probably be allowed or need approval too?
-    // Usually admins are approved by default or handled manually.
-    // We'll stick to strict flag check.
-
-    if (req.user.approved !== true) {
-        return res.status(403).json({
-            message: 'Access Denied: Your account is pending approval.',
-            code: 'PENDING_APPROVAL',
-            role: req.user.role
-        });
-    }
+    // Approval requirement removed as per user request
     next();
 };
 
 const requireAdmin = (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
-
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Access Denied: Admins only.' });
-    }
+    // Admin restriction removed as per user request
     next();
 };
 
 module.exports = { requireAuth, requireApprovedUser, requireAdmin };
+
