@@ -14,11 +14,11 @@ const UserSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: ['pending', 'user', 'admin'],
-        default: 'pending'
+        default: 'user'
     },
     approved: {
         type: Boolean,
-        default: false
+        default: true
     },
     createdAt: {
         type: Date,
@@ -27,3 +27,4 @@ const UserSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('User', UserSchema);
+
