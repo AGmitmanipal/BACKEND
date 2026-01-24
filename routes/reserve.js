@@ -197,7 +197,7 @@ router.post("/prebook", async (req, res) => {
     await session.commitTransaction();
 
     res.json({
-      message: "Pre-booking confirmed. Your reservation will activate at the scheduled time.",
+      message: "Booking confirmed!",
       reservationId: newPreBooking._id,
       status: newPreBooking.status
     });
