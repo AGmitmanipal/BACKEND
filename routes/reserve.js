@@ -277,7 +277,7 @@ router.post("/reserve", async (req, res) => {
         if (!overlapsOwnPrebooking) {
           await session.abortTransaction();
           return res.status(409).json({
-            message: "Your reservation time must overlap your pre-booking time window."
+            message: "You already have a future booking"
           });
         }
 
