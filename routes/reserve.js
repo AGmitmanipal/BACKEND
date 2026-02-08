@@ -117,7 +117,7 @@ router.post("/prebook", async (req, res) => {
   // Pre-bookings must be for future time
   if (start.getTime() <= now.getTime()) {
     return res.status(400).json({
-      message: "Pre-bookings must be for future time. Use /reserve for immediate reservations."
+      message: "Bookings must be for future time. Use Parking for immediate reservations."
     });
   }
 
@@ -142,7 +142,7 @@ router.post("/prebook", async (req, res) => {
     if (existing) {
       await session.abortTransaction();
       return res.status(409).json({
-        message: "You already have an active pre-booking or reservation in this zone."
+        message: "You already have an active booking or parking in this zone."
       });
     }
 
