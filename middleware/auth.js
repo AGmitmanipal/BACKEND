@@ -18,7 +18,14 @@ const requireAuth = async (req, res, next) => {
         }
 
         const token = authHeader.split(' ')[1];
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        let decodedToken;
+        try {
+            decodedToken = await admin.auth().verifyIdToken(token);
+        } catch (verifyError) {
+            console.error('🔥 Token Verification Failed:', verifyError.code, verifyError.message);
+            return res.status(401).json({ message: 'Unauthorized: Invalid token', code: verifyError.code, error: verifyError.message });
+        }
+
         const { uid, email } = decodedToken;
 
         // Find or Create User in MongoDB
@@ -26,24 +33,31 @@ const requireAuth = async (req, res, next) => {
         let user = await User.findOne({ uid });
 
         if (!user) {
-            user = await User.create({
-                uid,
-                email,
-                role: 'user', // Changed from 'pending'
-                approved: true // Changed from false
-            });
-            console.log(`✨ New user created: ${email} (${uid})`);
+            console.log(`👤 User not found in DB, creating new user for ${uid}`);
+            try {
+                user = await User.create({
+                    uid,
+                    email: email || `no-email-${uid}@placeholder.com`, // Handle missing email (e.g. phone auth)
+                    role: 'user',
+                    approved: true,
+                    vehiclePlate: 'PENDING'
+                });
+                console.log(`✨ New user created: ${user.email} (${uid})`);
+            } catch (createError) {
+                console.error('❌ Failed to create user in DB:', createError);
+                if (createError.name === 'ValidationError') {
+                    // This is a server/DB schema issue, not an invalid token
+                    return res.status(500).json({ message: 'Database Validation Error during user creation', error: createError.message });
+                }
+                throw createError;
+            }
         }
 
         req.user = user;
         next();
     } catch (error) {
-        console.error('🔥 Auth Error Details:', JSON.stringify(error, null, 2));
-        console.error('Token:', req.headers.authorization);
-        if (error.code === 'auth/argument-error') {
-            return res.status(401).json({ message: 'Invalid Token Format' });
-        }
-        res.status(401).json({ message: 'Unauthorized: Invalid token', error: error.message });
+        console.error('🔥 Auth Middleware Error:', error);
+        res.status(500).json({ message: 'Internal Server Authentication Error', error: error.message });
     }
 };
 
@@ -58,4 +72,5 @@ const requireAdmin = (req, res, next) => {
 };
 
 module.exports = { requireAuth, requireApprovedUser, requireAdmin };
+
 
