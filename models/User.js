@@ -23,8 +23,13 @@ const UserSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    vehiclePlate: {
+        type: String,
+        required: true
     }
 });
 
 module.exports = mongoose.model('User', UserSchema);
+
 
