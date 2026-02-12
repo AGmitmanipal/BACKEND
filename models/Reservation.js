@@ -59,4 +59,10 @@ Reservation.collection.createIndex(
   console.warn("⚠️ Warning: Could not create unique index on Reservations. This might be because of existing duplicate data.", err.message);
 });
 
+// OPTIMIZATION INDEX: Supports the dashboard aggregation query (group by zoneId + status)
+Reservation.collection.createIndex(
+  { zoneId: 1, status: 1 },
+  { background: true }
+).catch(err => console.error("Index Error:", err));
+
 module.exports = Reservation;
