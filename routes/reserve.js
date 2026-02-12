@@ -83,12 +83,18 @@ router.get("/reserve/book", async (req, res) => {
 
   try {
     const bookings = await Reservation.find({ userId }).sort({ toTime: -1 });
-    const detailed = await Promise.all(bookings.map(async b => {
-      const z = await Zone.findById(b.zoneId).select("name");
-      return {
-        ...b.toObject(),
-        zoneName: z ? z.name : "Unknown Zone"
-      };
+
+    // N+1 Optimization: Batch fetch zones
+    const zoneIds = [...new Set(bookings.map(b => b.zoneId))];
+    const zones = await Zone.find({ _id: { $in: zoneIds } }).select("name");
+    const zoneMap = {};
+    zones.forEach(z => {
+      zoneMap[z._id.toString()] = z.name;
+    });
+
+    const detailed = bookings.map(b => ({
+      ...b.toObject(),
+      zoneName: zoneMap[b.zoneId.toString()] || "Unknown Zone"
     }));
     res.json(detailed);
   } catch (err) {
@@ -117,7 +123,7 @@ router.post("/prebook", async (req, res) => {
   // Pre-bookings must be for future time
   if (start.getTime() <= now.getTime()) {
     return res.status(400).json({
-      message: "Bookings must be for future time. Use Parking for immediate reservations."
+      message: "Pre-bookings must be for future time. Use /reserve for immediate reservations."
     });
   }
 
@@ -142,7 +148,7 @@ router.post("/prebook", async (req, res) => {
     if (existing) {
       await session.abortTransaction();
       return res.status(409).json({
-        message: "You already have an active booking or parking in this zone."
+        message: "You already have an active pre-booking or reservation in this zone."
       });
     }
 
@@ -197,7 +203,7 @@ router.post("/prebook", async (req, res) => {
     await session.commitTransaction();
 
     res.json({
-      message: "Booking confirmed!",
+      message: "Pre-booking confirmed. Your reservation will activate at the scheduled time.",
       reservationId: newPreBooking._id,
       status: newPreBooking.status
     });
@@ -207,7 +213,7 @@ router.post("/prebook", async (req, res) => {
 
     if (err.code === 11000) {
       return res.status(409).json({
-        message: "You already have an active booking or parking in this zone."
+        message: "You already have an active pre-booking or reservation in this zone."
       });
     }
 
@@ -238,7 +244,7 @@ router.post("/reserve", async (req, res) => {
   // Reservations represent "check-in now" only (no future reservations).
   if (start.getTime() > now.getTime()) {
     return res.status(400).json({
-      message: "Parking must start now (or earlier)."
+      message: "Reservations must start now (or earlier). For future time windows, use /prebook."
     });
   }
 
@@ -270,14 +276,14 @@ router.post("/reserve", async (req, res) => {
         if (!isActiveReservationWindow) {
           await session.abortTransaction();
           return res.status(409).json({
-            message: "Parkings are only allowed for present time (check-in now)."
+            message: "Reservations are only allowed for present time (check-in now)."
           });
         }
 
         if (!overlapsOwnPrebooking) {
           await session.abortTransaction();
           return res.status(409).json({
-            message: "You already have a future booking"
+            message: "Your reservation time must overlap your pre-booking time window."
           });
         }
 
@@ -305,7 +311,7 @@ router.post("/reserve", async (req, res) => {
         await existing.save({ session });
         await session.commitTransaction();
         return res.json({
-          message: "Booking converted to active parking.",
+          message: "Pre-booking converted to active reservation.",
           reservationId: existing._id,
           status: "reserved"
         });
@@ -320,13 +326,13 @@ router.post("/reserve", async (req, res) => {
         await session.abortTransaction();
         if (isSameSlot) {
           return res.json({
-            message: "You already have an active parking for this time slot.",
+            message: "You already have an active reservation for this time slot.",
             reservationId: existing._id,
             status: "reserved"
           });
         }
         return res.status(409).json({
-          message: "You already have an active parking in this zone."
+          message: "You already have an active reservation in this zone. Only one active action per zone allowed."
         });
       }
     }
@@ -358,7 +364,7 @@ router.post("/reserve", async (req, res) => {
     await session.commitTransaction();
 
     return res.json({
-      message: "Parking confirmed",
+      message: "Reservation confirmed. Parking is active and counted as reserved.",
       reservationId: newReservation._id,
       status: newReservation.status
     });
@@ -367,7 +373,7 @@ router.post("/reserve", async (req, res) => {
 
     if (err.code === 11000) {
       return res.status(409).json({
-        message: "You already have an active parking or booking in this zone."
+        message: "You already have an active reservation or pre-booking in this zone."
       });
     }
 
@@ -417,3 +423,4 @@ router.delete("/reserve/:id", async (req, res) => {
 });
 
 module.exports = { reserveRouter: router, startReservationCron };
+
